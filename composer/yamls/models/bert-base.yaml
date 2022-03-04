@@ -2,8 +2,8 @@ train_dataset:
   lm:
     split: train
     datadir:
-      - /datasets/wikipedia_saved_bert_128
-      - /datasets/bookcorpus_saved_bert_128
+      - /localdisk/wikipedia_saved
+      - /localdisk/bookcorpus_saved
     tokenizer_name: bert-base-uncased
     seed: 19
     shuffle: true
@@ -17,8 +17,8 @@ val_dataset:
   lm:
     split: validation
     datadir:
-      - /datasets/wikipedia_saved_bert_128
-      - /datasets/bookcorpus_saved_bert_128
+      - /localdisk/wikipedia_saved
+      - /localdisk/bookcorpus_saved
     tokenizer_name: bert-base-uncased
     seed: 19
     shuffle: true
