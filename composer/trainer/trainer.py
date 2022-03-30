@@ -487,6 +487,7 @@ class Trainer:
         load_path: Optional[str] = None,
         load_object_store: Optional[ObjectStore] = None,
         load_weights_only: bool = False,
+        # TODO (Koin): discuss the implementation of removing keys from a model
         load_strict: bool = False,
         load_chunk_size: int = 1_048_576,
         load_progress_bar: bool = True,
