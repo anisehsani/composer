@@ -6,9 +6,12 @@
 
 import os
 import shutil
+import signal
 import textwrap
 from time import sleep, time
 from urllib.parse import urlparse
+
+from composer.utils.file_helpers import get_file
 
 __all__ = ["safe_download"]
 
@@ -31,30 +34,30 @@ def wait_for_download(local: str, timeout: float = 60) -> None:
         i += 1
 
 
-def download_from_s3(remote: str, local: str, timeout: float) -> None:
-    """Download a file from remote to local.
+# def download_from_s3(remote: str, local: str, timeout: float) -> None:
+#     """Download a file from remote to local.
 
-    Args:
-        remote (str): Remote path (S3).
-        local (str): Local path (local filesystem).
-        timeout (float): How long to wait for shard to download before raising an exception.
-    """
-    try:
-        import boto3  # type: ignore (third-party)
-        from botocore.config import Config  # type: ignore (third-party)
-    except ImportError as e:
-        raise ImportError(
-            textwrap.dedent("""\
-            Composer was installed without streaming support. To use streaming with Composer, run: `pip install mosaicml
-            [streaming]` if using pip or `conda install -c conda-forge monai` if using Anaconda""")) from e
+#     Args:
+#         remote (str): Remote path (S3).
+#         local (str): Local path (local filesystem).
+#         timeout (float): How long to wait for shard to download before raising an exception.
+#     """
+#     try:
+#         import boto3  # type: ignore (third-party)
+#         from botocore.config import Config  # type: ignore (third-party)
+#     except ImportError as e:
+#         raise ImportError(
+#             textwrap.dedent("""\
+#             Composer was installed without streaming support. To use streaming with Composer, run: `pip install mosaicml
+#             [streaming]` if using pip or `conda install -c conda-forge monai` if using Anaconda""")) from e
 
-    obj = urlparse(remote)
-    if obj.scheme != 's3':
-        raise ValueError(f"Expected obj.scheme to be 's3', got {obj.scheme} for remote={remote}")
+#     obj = urlparse(remote)
+#     if obj.scheme != 's3':
+#         raise ValueError(f"Expected obj.scheme to be 's3', got {obj.scheme} for remote={remote}")
 
-    config = Config(read_timeout=timeout)
-    s3 = boto3.client('s3', config=config)
-    s3.download_file(obj.netloc, obj.path[1:], local)
+#     config = Config(read_timeout=timeout)
+#     s3 = boto3.client('s3', config=config)
+#     s3.download_file(obj.netloc, obj.path[1:], local)
 
 
 def download_from_local(remote: str, local: str) -> None:
@@ -67,7 +70,7 @@ def download_from_local(remote: str, local: str) -> None:
     shutil.copy(remote, local)
 
 
-def download(remote: str, local: str, timeout: float) -> None:
+def download(remote: str, local: str, timeout: float, retries: int = 3) -> None:
     """Download a file from remote to local.
 
     Args:
@@ -78,10 +81,38 @@ def download(remote: str, local: str, timeout: float) -> None:
     local_dir = os.path.dirname(local)
     os.makedirs(local_dir, exist_ok=True)
 
+    # get_file just symlinks if file not found, unclear if that is desired
     if remote.startswith('s3://'):
-        download_from_s3(remote, local, timeout)
-    else:
-        download_from_local(remote, local)
+        # create s3 browser link
+        u = urlparse(remote)
+        u._replace(scheme="https://")
+        bucket_name = u.netloc
+        u._replace(netloc="s3.amazonaws.com/" + bucket_name)
+        s3_url = u.geturl()
+        #download_from_s3(remote, local, timeout, object_store=None)
+        # Ask about chunk size
+
+    # get_file just symlinks if file not found, unclear if that is desired
+    def timeout_handler(signum, frame):
+        raise Exception("Timeout limit reached - stopping download.")
+
+    signal.signal(signal.SIGALRM, timeout_handler)
+
+    while retries >= 0:
+        try:
+            signal.alarm(timeout)
+            get_file(path=s3_url, destination=local, progress_bar=True)
+            signal.alarm(0)
+        except Exception as e:
+            retries -= 1
+
+    #check path exists:
+    if not os.path.exists(local):
+        # or raise exception?
+        pass
+
+    # else:
+    #     download_from_local(remote, local)
 
 
 def safe_download(remote: str, local: str, max_retries: int = 2, timeout: float = 60) -> None:
