@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, TextIO, Union
 import tqdm.auto
 
 from composer.core.state import State
+from composer.core.time import TimeUnit
 from composer.loggers.logger import Logger, LogLevel, format_log_data_value
 from composer.loggers.logger_destination import LoggerDestination
 from composer.utils import dist
@@ -59,6 +60,26 @@ class _ProgressBarLoggerInstance:
 
     def state_dict(self) -> Dict[str, Any]:
         return asdict(self.state)
+
+class CustomProgressBarLogger(LoggerDestination):
+    def __init__(
+        self,
+        # change this later so that we can customize what goes in here
+        bar_format: str = f'{state.description} {{l_bar}}{{bar:25}}{{r_bar}}{{bar:-1b}}',
+        unit: Union[str, TimeUnit] = TimeUnit.BATCH,
+        dataloader_label: Optional[str] = None,
+        metrics: Optional[str] = None,
+        plot_metrics: bool = False,
+    ):
+        pass
+
+    def get_bar_format(self, state: State) -> str:
+        """Returns the bar format string"""
+        return self.bar_format
+    
+    def get_postfix(self, state: State) -> str:
+        return 
+
 
 
 class ProgressBarLogger(LoggerDestination):
